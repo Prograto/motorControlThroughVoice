@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            border-radius: 10px;
+            color: white;
+            background-color: teal;
+            cursor: pointer;
+            border: none;
+            font-size: 16px;
+        }
+
+        #status {
+            margin-top: 20px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .on-background {
+            background-color: lightgreen;
+            transition: background-color 0.5s ease;
+        }
+
+        .off-background {
+            background-color: lightcoral;
+            transition: background-color 0.5s ease;
+        }
+    </style>
+    <title>Speech Command with Google Sheets</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <h1>Control with Voice Commands</h1>
+    <p>Say "on" or "off" to send commands to Google Sheets.</p>
+    <button onclick="startRecognition()">Start Speaking</button>
+    <p id="result">Awaiting your command...</p>
+    <p id="status">Status: Not updated</p>
+
+    <script>
+        const scriptUrl = 'https://script.google.com/macros/s/AKfycbyDuJG6FAy-ZQDanPb3qomBpis9xQklbDQX1iH6W0OByzCN5s-39ndb-3o_oZoP3H8ZTw/exec';
+
+        // Voice command recognition
+        function startRecognition() {
+            const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.lang = 'en-US';
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+
+            recognition.start();
+
+            recognition.onresult = function(event) {
+                const speechResult = event.results[0][0].transcript.toLowerCase();
+                document.getElementById('result').innerText = 'You said: ' + speechResult;
+
+                if (speechResult.includes("on")) {
+                    sendAction('ON');
+                    document.body.className = "on-background";
+                } else if (speechResult.includes("off")) {
+                    sendAction('OFF');
+                    document.body.className = "off-background";
+                } else {
+                    document.getElementById('result').innerText = 'Unrecognized command. Say "on" or "off".';
+                }
+            };
+
+            recognition.onerror = function(event) {
+                console.error('Error occurred in recognition:', event.error);
+            };
+        }
+
+        // Update status from Google Sheets
+        function updateStatus() {
+            $.get(scriptUrl, { action: 'getStatus' }, function(data) {
+                $('#status').text('Status: ' + data);
+                if (data === "ON") {
+                    document.body.className = "on-background";
+                } else if (data === "OFF") {
+                    document.body.className = "off-background";
+                }
+                console.log('Status updated:', data);
+            });
+        }
+
+        // Send command to Google Sheets
+        function sendAction(action) {
+            const payload = {
+                timestamp: new Date().toISOString(),
+                action: action
+            };
+
+            $.post(scriptUrl, JSON.stringify(payload), function() {
+                updateStatus();
+                document.getElementById('result').innerText = `Command "${action}" sent successfully.`;
+            }).fail(function() {
+                document.getElementById('result').innerText = 'Failed to send command. Try again.';
+            });
+        }
+
+        // Initialize status on page load
+        $(document).ready(function() {
+            updateStatus();
+        });
+    </script>
+</body>
+</html>
